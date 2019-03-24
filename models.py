@@ -1,6 +1,7 @@
 from preprocessing import *
 from keras.layers import Dense, Flatten, Input, concatenate, Reshape
-from kerass.models import Model
+from keras.models import Model
+
 def amplitude_model():
     amplitude_input = Input(shape=(NB_BINS, NB_CHANNELS, 2*CONTEXT_SIZE+1))
     amplitude_output = Flatten()(amplitude_input)
@@ -20,8 +21,11 @@ def full_model(target_name):
     phase_input, phase_output = phase_model()
 
     output = concatenate([amplitude_output, phase_output])
-    ouput = Dense(2*NB_BINS, activation='relu')(output)
-    output = Reshape((FFT_BINS, 2))(output)
+    output = Dense(2*NB_BINS, activation='relu')(output)
+    output = Reshape((NB_BINS, 2))(output)
     
-    model = Model(input=[amplitude_input, phase_input], ouput=output, name=target_name)
+    model = Model(input=[amplitude_input, phase_input], output=output, name=target_name)
     model.compile(loss='mean_squared_error', optimizer='adam')
+
+    return model
+

@@ -15,7 +15,7 @@ def extract_stft(track):
         amplitude {array} -- amplitude of the STFT : (nb_bins, nb_channels, nb_time_windows)
     """
 
-    _, _, track_stft = stft(track.audio, fs=SAMPLE_RATE, nperseg=N_FFT, noverlap=N_OVERLAP)
+    _, _, track_stft = stft(track.audio, fs=SAMPLE_RATE, nperseg=N_FFT, noverlap=N_OVERLAP, axis=0)
     phase, amplitude = np.angle(track_stft), np.absolute(track_stft)
 
     return amplitude, phase
@@ -112,7 +112,7 @@ def extract_context(idx, a, context_size = CONTEXT_SIZE):
     else:
         context = np.concatenate([
             a[:,:,idx - context_size:],
-            np.zeros((a.shape[:2] + (idx + context_size - a.shape[-1] + 1),))
+            np.zeros((a.shape[:2] + (idx + context_size - a.shape[-1] + 1,)))
         ], axis=-1)
 
     return context
@@ -130,11 +130,11 @@ def process_track(track):
     """
 
     amplitude, phase = extract_stft(track)
-    dt_phase, df_phase = time_correct(phaese), frequency_correct(phase)
+    dt_phase, df_phase = time_correct(phase), frequency_correct(phase)
 
     return amplitude, dt_phase, df_phase
 
-def process_all(tracks, context_size=CONTEXT_SIZE):
+def process_all_tracks(tracks, context_size=CONTEXT_SIZE):
     """Processes a list of tracks in order to prepare them to be fed to the network
     
     Arguments:
@@ -159,7 +159,25 @@ def process_all(tracks, context_size=CONTEXT_SIZE):
         ], axis=1)
         for i in range(df_phase.shape[-1])]
 
-    return amplitudes, phases
+    return [amplitudes, phases]
+
+def process_target(tracks, target_name, context_size=CONTEXT_SIZE):
+    amplitudes = None
+    is_empty = True
+    for track in tracks:
+        amplitude, _, _ = process_track(track.targets[target_name])
+        if is_empty:
+            amplitudes = amplitude
+            is_empty = False
+        else:
+            amplitudes = np.concatenate([amplitudes, amplitude], axis=-1)
+        
+    amplitudes = amplitudes.swapaxes(0,2)
+    amplitudes = amplitudes.swapaxes(1,2)
+
+    return amplitudes
+    
+    return amplitudes
 
 def reconstruct(amplitude, phase):
     """Reconstructs audio track from amplitude and phase
@@ -172,5 +190,5 @@ def reconstruct(amplitude, phase):
         track_audio {array} -- reconstucted audio track
     """
 
-    track_audio = istft(amplitude * np.exp(1j * np.phase), fs=SAMPLE_RATE, nperseg=N_FFT, noverlap=N_OVERLAP, freq_axis=0)
+    track_audio = istft(amplitude * np.exp(1j * phase), fs=SAMPLE_RATE, nperseg=N_FFT, noverlap=N_OVERLAP, freq_axis=0)
     return track_audio
